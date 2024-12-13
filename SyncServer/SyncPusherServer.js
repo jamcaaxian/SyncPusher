@@ -1,4 +1,4 @@
-import { config } from './SyncPusherConfig.js';
+const { config } = require('./SyncPusherConfig.js');
 
 console.language = {
     'en-US': {
