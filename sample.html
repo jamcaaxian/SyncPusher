@@ -34,7 +34,7 @@
         const send = document.getElementById('send');
         send.addEventListener('click', () => {
             allMessages.push(input.value);
-            chat.sync(allMessages);
+            chat.push(allMessages);
             input.value = '';
         });
     </script>
