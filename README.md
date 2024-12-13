@@ -36,7 +36,7 @@ You can also [manually download the compressed package](https://github.com/jamca
 
 If it is the first time to configure NodeJS, you need to initialize the project first. Execute in the directory where `SyncPusherServer.js` is located:
 ```CLI (CMD | PowerShell | Bash)
-node init -y # Automatically generate package.json file
+npm init -y # Automatically generate package.json file
 ```
 
 3. **Get Pusher key**
