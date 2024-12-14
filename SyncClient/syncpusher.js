@@ -8,8 +8,7 @@ class SyncPusher {
             api: config.api,
             pusherjs: config?.pusherjs || "https://js.pusher.com/8.2.0/pusher.min.js",
             cluster: config?.cluster || "ap1",
-            channel: config?.channel || "sync-channel",
-            event: config?.event || "sync-event",
+            channel: "presence-cache-" + (config?.channel || "sync"),
             method: config?.method || "POST",
             retries: config?.retries || 3,
             delay: config?.delay || 1000,
@@ -17,6 +16,12 @@ class SyncPusher {
         };
 
         this.initPusher();
+    }
+
+    log(message, type = "log") {
+        if (this.config.logToConsole) {
+            console[type]?.(message) || console.log(message);
+        }
     }
 
     initPusher() {
@@ -35,11 +40,26 @@ class SyncPusher {
     }
 
     setupPusher() {
-        Pusher.logToConsole = this.config.logToConsole;
-
         const pusher = new Pusher(this.config.key, { cluster: this.config.cluster });
+        pusher.logToConsole = this.config.logToConsole;
+
+        const connection = pusher.connection;
+        connection.bind("initialized", () => this.connection.initialized());
+        connection.bind("connecting", () => this.connection.connecting());
+        connection.bind("connected", () => this.connection.connected());
+        connection.bind("unavailable", () => this.connection.unavailable());
+        connection.bind("failed", () => this.connection.failed());
+        connection.bind("disconnected", () => this.connection.disconnected());
+        connection.bind("error", (error) => this.connection.error(error));
+        connection.bind("state_change", (state) => this.connection.stateChange(state));
+
         const channel = pusher.subscribe(this.config.channel);
-        channel.bind(this.config.event, (data) => this.sync(data));
+        channel.bind("pusher:subscription_succeeded", (members) => this.connected(members));
+        channel.bind("pusher:member_added", (member) => this.joined(member));
+        channel.bind("pusher:member_removed", (member) => this.left(member));
+        channel.bind("pusher:subscription_error", (error) => this.error(error));
+        channel.bind("pusher:cache_miss", () => this.init());
+        channel.bind("sync", (data) => this.sync(data));
     }
 
     async fetch(url, options, retries = this.config.retries, delay = this.config.delay) {
@@ -61,6 +81,68 @@ class SyncPusher {
         }
     }
 
+    connection = {
+        initialized: () => {
+            this.log("Pusher connection initialized.")
+        },
+        connecting: () => {
+            this.log("Pusher connecting...")
+        },
+        connected: () => {
+            this.log("Pusher connected.")
+        },
+        unavailable: () => {
+            this.log("Pusher unavailable.")
+        },
+        failed: () => {
+            this.log("Pusher failed.")
+        },
+        disconnected: () => {
+            this.log("Pusher disconnected.")
+        },
+        error: (error) => {
+            this.log(`Pusher error: ${error.message}`, "error")
+        },
+        stateChange: (state) => {
+            this.log(`Pusher state changed: ${state}`)
+        },
+    }
+
+    connected(members) {
+        this.log(`Subscribed to channel: ${ this.config.channel}`);
+        this.log(`${members.count} member(s) in channel.`);
+        members.each(function (member) {
+            this.log(`MemberId: ${member.id})`);
+            this.log(`MemberInfo: ${member.info}`);
+        });
+        this.log(`MyId: ${members.me.id}`);
+        this.log(`MyInfo: ${members.me.info}`);
+    }
+
+    joined(member) {
+        this.log(`Member joined, Id: ${member.id})`);
+        this.log(`Member Info: ${member.info}`);
+    }
+
+    left(member) {
+        this.log(`Member left, Id: ${member.id})`);
+        this.log(`Member Info: ${member.info}`);
+    }
+
+    error(error) {
+        this.log(`Connection Error: ${error.error}`, "error");
+    }
+
+    init() {
+        const data = [];
+        this.log("Initiating cache...");
+        this.push(data);
+    }
+
+    sync(data) {
+        console.log("Received sync data:", JSON.stringify(data));
+    }
+    
     push(data) {
         const api = new URL(this.config.api);
         let options;
@@ -68,7 +150,7 @@ class SyncPusher {
         if (this.config.method === "GET") {
             options = { method: "GET" };
             api.searchParams.append("channel", this.config.channel);
-            api.searchParams.append("event", this.config.event);
+            api.searchParams.append("event", "sync");
             api.searchParams.append("data", encodeURIComponent(data));
         } else {
             options = {
@@ -78,7 +160,7 @@ class SyncPusher {
                 },
                 body: JSON.stringify({
                     channel: this.config.channel,
-                    event: this.config.event,
+                    event: "sync",
                     data: data,
                 }),
             };
@@ -93,15 +175,5 @@ class SyncPusher {
                 this.log(`Push failed: ${error.message}`, "error");
                 throw error;
             });
-    }
-
-    sync(data) {
-        console.log("Received sync data:", JSON.stringify(data));
-    }
-
-    log(message, type = "log") {
-        if (this.config.logToConsole) {
-            console[type]?.(message) || console.log(message);
-        }
     }
 }

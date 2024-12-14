@@ -6,7 +6,7 @@ SyncPusher is an open source NodeJS application that can help you use Pusher to 
 
 ### Features:
 
-- **Easy to use**: The front end only needs to use 3 functions, and at least only 2 lines of JS code need to be created to see the data synchronization effect
+- **Easy to use**: The front end only needs to use 2 functions, and at least only 2 lines of JS code need to be created to see the data synchronization effect
 
 - **Lightweight and compact**: The back end only needs 3 files, which is very small in size and occupies very little memory during operation, suitable for running in various server environments
 
